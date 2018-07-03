@@ -26,7 +26,6 @@
     - python-nose
     - python-httplib2
     - python-psycopg2
-    - python-software-properties
     - gettext
     - build-essential
     - libxml2-dev
@@ -39,6 +38,7 @@
     - zip
     - libjpeg-dev
     - libpng-dev
+    - libgdal-dev
 
 
 - name: install known_hosts file to access GitHub
@@ -67,11 +67,16 @@
        virtualenv={{virtualenv_dir}}/{{app_name}}
        extra_args='-U'
 
-- name: install django to initialize the geonode-project template
-  pip: name=Django
-       version=1.8.7
+- name: upload requirements file
+  copy: src=requirements.txt dest="{{virtualenv_dir}}/{{app_name}}/requirements.txt"
+
+- name: install celery required in GeoNode setup.py
+  pip: name=celery
        virtualenv={{virtualenv_dir}}/{{app_name}}
-  when: github_user == "GeoNode"
+       version=4.1.0
+
+- name: install web application dependencies listed in requirements.txt
+  pip: requirements={{virtualenv_dir}}/{{app_name}}/requirements.txt virtualenv={{virtualenv_dir}}/{{app_name}}
 
 - name: checkout latest web app code from geonode-project {{branch_name}} branch
   shell: cd {{app_code_dir}} && {{virtualenv_dir}}/{{app_name}}/bin/django-admin.py startproject {{app_name}} --template=https://github.com/GeoNode/geonode-project/archive/{{branch_name}}.zip -e py,rst,yml -n Vagrantfile
@@ -80,32 +85,10 @@
 - name: copy the local_settings.py file in place
   template: src=local_settings.py.j2 dest={{app_code_dir}}/{{app_name}}/{{app_name}}/local_settings.py
 
-- name: patch allowed hosts in settings.py
-  shell: sed -i -e "s/ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', \['localhost', \])/ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', \['localhost', '{{ server_name }}'\])/g" {{app_code_dir}}/{{app_name}}/{{app_name}}/settings.py
-  when: github_user != "GeoNode"
-
-- name: patch hostname in settings.py
-  shell: sed -i -e "s/localhost:8080/{{ server_name }}/g" {{app_code_dir}}/{{app_name}}/{{app_name}}/settings.py
-  when: github_user != "GeoNode"
-
-- name: install default geonode version {{geonode_version}}
-  pip: name=geonode
-       version={{geonode_version}}
-       virtualenv={{virtualenv_dir}}/{{app_name}}
-
-- name: check if requirements file exists
-  stat:
-    path: "{{app_code_dir}}/{{app_name}}/requirements.txt"
-  register: requirements_file
-
-- name: install web application dependencies listed in requirements.txt
-  pip: requirements={{app_code_dir}}/{{app_name}}/requirements.txt virtualenv={{virtualenv_dir}}/{{app_name}}
-  when: requirements_file.stat.exists
-
-- name: install web application
-  pip: name=file:///{{app_code_dir}}/{{app_name}}
-       virtualenv={{virtualenv_dir}}/{{app_name}}
-       extra_args='-e'
+#- name: install web application
+#  pip: name=file:///{{app_code_dir}}/{{app_name}}
+#       virtualenv={{virtualenv_dir}}/{{app_name}}
+#       extra_args='-e'
 
 # FIXME: Remove the following 4 commands once GeoNode 2.6.4 is released
 - name: Temporary fix to downgrade package transifex-client
@@ -158,7 +141,7 @@
   file: path=/var/www/{{app_name}}/uploaded/documents/ state=directory mode=0777 owner=www-data group=www-data
   become: yes
 
-- name: rename the vassals-default.ini file to the app name 
+- name: rename the vassals-default.ini file to the app name
   file: src=/etc/uwsgi-emperor/vassals/vassals-default.skel dest=/etc/uwsgi-emperor/vassals/{{app_name}}.ini owner=www-data group=www-data state=link
   become: yes
   when: not apache
@@ -187,13 +170,9 @@
                  lc_ctype='en_US.UTF-8'
                  owner={{db_user}}
                  template='template0'
-  become: yes
-  become_user: postgres
 
 - name: add postgis to the {{db_metadata_instance}} db
   postgresql_ext: name=postgis db={{db_metadata_instance}}
-  become: yes
-  become_user: postgres
 
 - name: create {{db_data_instance}} db
   postgresql_db: name={{db_data_instance}}
@@ -202,13 +181,9 @@
                  lc_ctype='en_US.UTF-8'
                  owner={{db_user}}
                  template='template0'
-  become: yes
-  become_user: postgres
 
 - name: add postgis to the {{db_data_instance}} db
   postgresql_ext: name=postgis db={{db_data_instance}}
-  become: yes
-  become_user: postgres
 
 - name: make manage.py executable
   become: yes
@@ -243,8 +218,8 @@
 - name: wait for geoserver to be up
   shell: curl --head --silent http://localhost:8080/geoserver/web/
   register: result
-  until: result.stdout.find('200 OK') != -1
-  retries: 5 
+  until: result.stdout.find(' 200') != -1
+  retries: 5
   delay: 60
 
 - name: Copy create_db_store script in place
@@ -266,6 +241,7 @@
   stat:
     path: /var/lib/tomcat8/webapps/geoserver/data/security/filter/geonode-oauth2/config.xml
   register: geonode_oauth_config
+  become: yes
 
 - name: Copy oauth fixture in place
   template: src=default_oauth_apps.json.j2 dest={{app_code_dir}}/{{app_name}}/default_oauth_apps.json
