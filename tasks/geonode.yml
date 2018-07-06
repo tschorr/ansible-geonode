@@ -86,6 +86,9 @@
 - name: copy the local_settings.py file in place
   template: src=local_settings.py.j2 dest={{app_code_dir}}/{{app_name}}/{{app_name}}/local_settings.py
 
+- name: remove MEDIA_ROOT definition in settings.py since it is defined in local_settings
+  shell: sed -i -e "/MEDIA_ROOT =/d" {{app_code_dir}}/{{app_name}}/{{app_name}}/settings.py
+
 - name: patch local_settings import in settings.py
   shell: sed -i -e "s/    from geonode\.local_settings import \*/    from \.local_settings import \*/" {{app_code_dir}}/{{app_name}}/{{app_name}}/settings.py
 
