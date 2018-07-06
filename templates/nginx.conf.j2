@@ -16,7 +16,7 @@ server {
     }
 
     location @wsgiapp {
-        uwsgi_pass  unix:///tmp/{{ app_name }}.sock;
+        uwsgi_pass  127.0.0.1:6543;
         include     /etc/nginx/uwsgi_params;
         add_header Access-Control-Allow-Origin "*";
     }

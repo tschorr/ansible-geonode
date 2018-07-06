@@ -1,12 +1,8 @@
 [uwsgi]
-;unix socket (referenced in nginx configuration)
-socket = /tmp/%n.sock
+socket = 127.0.0.1:6543
 
 processes = 4
 max_request = 300
-
-# set mode of created UNIX socket
-chmod-socket = 666
 
 buffer-size = 32768
 

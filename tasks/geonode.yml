@@ -39,6 +39,7 @@
     - libjpeg-dev
     - libpng-dev
     - libgdal-dev
+    - curl
 
 
 - name: install known_hosts file to access GitHub
@@ -85,10 +86,13 @@
 - name: copy the local_settings.py file in place
   template: src=local_settings.py.j2 dest={{app_code_dir}}/{{app_name}}/{{app_name}}/local_settings.py
 
-#- name: install web application
-#  pip: name=file:///{{app_code_dir}}/{{app_name}}
-#       virtualenv={{virtualenv_dir}}/{{app_name}}
-#       extra_args='-e'
+- name: patch local_settings import in settings.py
+  shell: sed -i -e "s/    from geonode\.local_settings import \*/    from \.local_settings import \*/" {{app_code_dir}}/{{app_name}}/{{app_name}}/settings.py
+
+- name: patch allowed hosts in settings.py
+  shell: sed -i -e "s/    ALLOWED_HOSTS = \['localhost', 'django', 'geonode'\]/    ALLOWED_HOSTS = \['localhost', '{{ server_name }}'\]/" {{app_code_dir}}/{{app_name}}/{{app_name}}/settings.py
+  notify:
+    - restart uwsgi
 
 # FIXME: Remove the following 4 commands once GeoNode 2.6.4 is released
 - name: Temporary fix to downgrade package transifex-client
