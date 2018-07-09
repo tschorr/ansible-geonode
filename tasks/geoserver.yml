@@ -132,6 +132,18 @@
     regexp: '\s*<passwordEncoderName>.*'
     line: '  <passwordEncoderName>digestPasswordEncoder</passwordEncoderName>'
 
+- name: Remove PostgreSQL 8.4 JDBC driver - see https://github.com/geonetwork/core-geonetwork/issues/1887
+  file:
+    path: /var/lib/tomcat8/webapps/geoserver/WEB-INF/lib/postgresql-8.4-702.jdbc3.jar
+    state: absent
+  become: yes
+
+- name: Remove PostGIS stubs for the same reason
+  file:
+    path: /var/lib/tomcat8/webapps/geoserver/WEB-INF/lib/postgis-stubs-1.3.3.jar
+    state: absent
+  become: yes
+
 - name: restarting Tomcat
   become: yes
   service:
